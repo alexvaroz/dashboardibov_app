@@ -3,51 +3,81 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 
+stocks_list = ["BBAS3.SA", "PETR4.SA", "BBAS3.SA", "MRFG3.SA", "PRIO3.SA",
+               "VALE3.SA", "MGLU3.SA", "VIIA3.SA", "WEGE3.SA", "TASA4.SA"]
+
+dict_line_colors = {'mv_7d': 'gray', 'mv_50d': 'green', 'mv_200d': 'blue'}
+
 
 @st.cache
-def load_data():
-    stocks_list = ["PRIO3.SA"]  # , "PETR4.SA", "BBAS3.SA", "MRFG3.SA"]
-    start_date = "2017-01-01"
+def load_data(stock_lst=stocks_list):
+    start_date = "2016-01-01"
     end_date = pd.to_datetime("today").date().isoformat()
-    fields = ["Adj Close", "Open", "High", "Low"]
-    data = yf.download(tickers=stocks_list, start=start_date, end=end_date)[fields]
-    raw_info = yf.Ticker(stocks_list[0])
-    data_info = {"symbol": raw_info.info['symbol'],
-                 "sector": raw_info.info['sector'],
-                 "summary": raw_info.info['longBusinessSummary']}
-    return data, data_info
+    fields = ["Close", "Open", "High", "Low"]
+    data = yf.download(tickers=stock_lst, start=start_date, end=end_date)[fields]
+    return data
+
+
+st.set_page_config(
+        "Dashboard by AVR",
+        initial_sidebar_state="expanded",
+        layout="wide",
+    )
 
 
 # Load the data
-df, df_info = load_data()
-
-fig = go.Figure()
-fig.add_trace(go.Candlestick(x=df.index,
-                             open=df["Open"],
-                             high=df["High"],
-                             low=df["Low"],
-                             close=df["Adj Close"],
-                             name = "market data"))
-fig.update_layout(title = "Stock Prices", yaxis_title = "Stock Price (R$)")
-fig.update_xaxes(rangeslider_visible=True)
-
-# hide weekends
-fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+df_full = load_data()
 
 # SIDE BAR
-st.sidebar.header(df_info["symbol"])
-st.sidebar.info(df_info["sector"])
+st.sidebar.header("Stock to be analysed")
+stock_selected = st.sidebar.selectbox('Stock to select', stocks_list)
 
-# Slider de seleção do ano
-st.sidebar.subheader("Ano")
-year_to_filter = st.sidebar.slider("Escolha o ano desejado:",
-                                   int(df.index.year.min()),
-                                   int(df.index.year.max()),
-                                   int(df.index.year.min()))
-st.sidebar.info(df_info["summary"])
+df = df_full[[('Close', stock_selected), ('Open', stock_selected),
+              ('High', stock_selected), ('Low', stock_selected)]]
+df = df.droplevel(1, axis=1)
+
 
 # MAIN
-st.title(df_info["symbol"])
+st.title(stock_selected)
 
-st.plotly_chart(fig, use_container_width=True)
+
+def plot_candle_stick(df_, name='ticker', lines=[]):
+    trace = {
+      'x': df_.index,
+      'open': df_.Open,
+      'close': df_["Close"],
+      'high': df_.High,
+      'low': df_.Low,
+      'type': 'candlestick',
+      'name': name,
+      'showlegend': False
+    }
+
+    data = [trace]
+    layout = go.Layout()
+    fig = go.Figure(data=data, layout=layout)
+    if len(lines) > 0:
+        for c in lines:
+            fig.add_trace(
+                go.Scatter(x=list(df_.index),
+                           y=df_[c],
+                           mode='lines',
+                           line=dict(color=dict_line_colors[c]),
+                           name=c))
+    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+    return fig
+
+# mma
+# df['mv_7d_1.5_std'] = df.Close.rolling(7).mean() + df.Close.rolling(7).std()*1.5
+
+
+df['mv_7d'] = df["Close"].rolling(7).mean()
+df['mv_50d'] = df["Close"].rolling(50).mean()
+df['mv_200d'] = df["Close"].rolling(200).mean()
+
+st.plotly_chart(
+    plot_candle_stick(df, name=stock_selected, lines=['mv_7d', 'mv_50d', 'mv_200d']),
+    use_container_width=True)
+
+
 
