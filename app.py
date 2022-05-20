@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
+# teste
 
 stocks_list = ["BBAS3.SA", "PETR4.SA", "BBAS3.SA", "MRFG3.SA", "PRIO3.SA",
                "VALE3.SA", "MGLU3.SA", "VIIA3.SA", "WEGE3.SA", "TASA4.SA"]
